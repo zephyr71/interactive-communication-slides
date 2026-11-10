@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Interactive Communication</title>
+<style>
+@import url(https://cdn.jsdelivr.net/npm/nanumsquareneo@0.0.5/nanumsquareneo.css);
+:root{
+  --white:#FFFFFF; --body:#D1D1D6; --sub:#A1A1A6; --dim:#6E6E73; --line:#3A3A3C; --red:#FF3B30;
+  --bg:linear-gradient(135deg,#232326 0%,#0E0E10 48%,#000000 100%);
+  --bg-section:linear-gradient(135deg,#000000 25%,#1A0606 70%,#2E0B0B 100%);
+  --bg-theory:linear-gradient(135deg,#1A1A1D 0%,#0A0A0B 55%,#121216 100%);
+  --s:min(calc(100vw / 1920), calc(100vh / 1080));
+  --padx:max(calc(var(--s) * 170), 7vw);
+  --pady:calc(var(--s) * 100);
+  --ease:cubic-bezier(.2,.8,.2,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:"NanumSquareNeo","NanumSquare","Apple SD Gothic Neo","Malgun Gothic",sans-serif;color:var(--white);-webkit-font-smoothing:antialiased;word-break:keep-all}
+button{font-family:inherit;color:inherit}
+.slide{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;justify-content:center;padding:var(--pady) var(--padx);overflow:hidden;opacity:0;visibility:hidden;transition:opacity .6s ease,visibility .6s}
+.slide.center{align-items:center;text-align:center}
+.slide.section{background:var(--bg-section)}
+.slide.theory{background:var(--bg-theory)}
+.slide.active{opacity:1;visibility:visible}
+.r{color:var(--red)}
+.slide>*{position:relative;z-index:1}
+.slide>canvas.bgc{position:absolute;inset:0;width:100%;height:100%;z-index:0}
+
+/* 텍스트 계층 */
+.eyebrow{font-weight:500;font-size:calc(var(--s) * 26);color:var(--sub);letter-spacing:.12em;margin-bottom:calc(var(--s) * 28)}
+.badge{display:inline-block;border:1px solid var(--sub);border-radius:999px;padding:calc(var(--s) * 6) calc(var(--s) * 18);margin-right:calc(var(--s) * 16);letter-spacing:.14em}
+.title{font-weight:800;font-size:calc(var(--s) * 168);line-height:1.1;letter-spacing:-.03em}
+.head{font-weight:800;font-size:calc(var(--s) * 76);line-height:1.3;letter-spacing:-.02em}
+.head.xl{font-size:calc(var(--s) * 110);line-height:1.2}
+.head .en{display:block;font-weight:300;font-size:.5em;color:var(--sub);letter-spacing:0;margin-top:calc(var(--s) * 12)}
+.lead{font-weight:300;font-size:calc(var(--s) * 36);line-height:1.6;color:var(--body);margin-top:calc(var(--s) * 32)}
+.take{font-weight:500;font-size:calc(var(--s) * 36);line-height:1.55;margin-top:calc(var(--s) * 56)}
+.cite{margin-top:calc(var(--s) * 40);font-weight:300;font-size:calc(var(--s) * 22);line-height:1.6;color:var(--sub)}
+.center .cite{text-align:center}
+
+/* 목록형 */
+.rows{margin-top:calc(var(--s) * 48);display:flex;flex-direction:column}
+.row{display:grid;grid-template-columns:calc(var(--s) * 140) minmax(0,5fr) minmax(0,7fr);align-items:baseline;gap:calc(var(--s) * 24);border-top:1px solid var(--line);padding:calc(var(--s) * 22) 0;background:none;border-left:0;border-right:0;border-bottom:0;text-align:left;width:100%}
+.rows .row:last-child{border-bottom:1px solid var(--line)}
+.row .p{font-weight:500;font-size:calc(var(--s) * 24);color:var(--sub);letter-spacing:.1em}
+.row .t{font-weight:700;font-size:calc(var(--s) * 36)}
+.row .d{font-weight:300;font-size:calc(var(--s) * 28);color:var(--body);line-height:1.5}
+
+/* 카드 */
+.cards{display:grid;gap:calc(var(--s) * 48);margin-top:calc(var(--s) * 60)}
+.cards.c3{grid-template-columns:repeat(3,1fr)}
+.card{border-top:1px solid var(--line);padding-top:calc(var(--s) * 28)}
+.card .n{display:block;font-weight:500;font-size:calc(var(--s) * 22);color:var(--sub);letter-spacing:.1em;margin-bottom:calc(var(--s) * 10)}
+.card .k{display:block;font-weight:700;font-size:calc(var(--s) * 40);line-height:1.4;margin-bottom:calc(var(--s) * 14)}
+.card .v{display:block;font-weight:300;font-size:calc(var(--s) * 28);line-height:1.65;color:var(--body);min-height:calc(var(--s) * 96)}
+.card .res{display:block;font-weight:800;font-size:calc(var(--s) * 84);line-height:1.1;margin-top:calc(var(--s) * 26);color:var(--red);letter-spacing:-.02em}
+
+.split{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:calc(var(--s) * 80);align-items:center}
+.figure{margin-top:calc(var(--s) * 40);display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:calc(var(--s) * 64);align-items:center}
+.figure svg{width:100%;height:auto;max-height:calc(var(--s) * 700)}
+.figure svg text{font-family:"NanumSquareNeo",sans-serif}
+
+/* 버튼 · 슬라이더 */
+.btn{font:500 calc(var(--s) * 22)/1 "NanumSquareNeo",sans-serif;color:#fff;background:transparent;border:1px solid #636366;border-radius:999px;padding:calc(var(--s) * 14) calc(var(--s) * 30);cursor:pointer;transition:border-color .3s,background .3s}
+.btn:hover{border-color:#fff;background:rgba(255,255,255,.08)}
+.btn.red{border-color:var(--red);color:var(--red)}
+.btn.red:hover{background:rgba(255,59,48,.12)}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:calc(var(--s) * 34);background:transparent;cursor:pointer;display:block}
+input[type=range]::-webkit-slider-runnable-track{height:2px;background:linear-gradient(90deg,#fff var(--p,100%),#3A3A3C var(--p,100%))}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:calc(var(--s) * 28);height:calc(var(--s) * 28);border-radius:50%;background:#fff;border:0;margin-top:calc(var(--s) * -14 + 1px);box-shadow:0 0 0 calc(var(--s) * 8) rgba(255,255,255,.1)}
+input[type=range]::-moz-range-track{height:2px;background:#3A3A3C}
+input[type=range]::-moz-range-progress{height:2px;background:#fff}
+input[type=range]::-moz-range-thumb{width:calc(var(--s) * 28);height:calc(var(--s) * 28);border-radius:50%;background:#fff;border:0}
+
+/* ── 모션 ── */
+@keyframes fxUp{from{opacity:0;translate:0 calc(var(--s) * 34)}to{opacity:1;translate:0 0}}
+@keyframes fxFade{from{opacity:0}to{opacity:1}}
+@keyframes fxDraw{from{stroke-dashoffset:1}to{stroke-dashoffset:0}}
+.slide.fx-play .fx{animation:fxUp .85s var(--ease) backwards;animation-delay:calc(var(--i,0) * 110ms + 80ms)}
+.slide.fx-play .fxf{animation:fxFade 1.2s ease backwards;animation-delay:calc(var(--i,0) * 110ms + 80ms)}
+.draw [pathLength]{stroke-dasharray:1 1}
+.slide.fx-play .draw [pathLength]{animation:fxDraw 1.8s var(--ease) backwards;animation-delay:var(--d,.2s)}
+.slide.fx-play .fade{animation:fxFade 1.2s ease backwards;animation-delay:var(--d,0s)}
+.fx-light::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:0;transition:opacity .5s;background:radial-gradient(circle calc(var(--s) * 520) at var(--mx,50%) var(--my,50%),rgba(255,255,255,.07),transparent 70%)}
+.slide.active.fx-light::after{opacity:1}
+.fx-glow::before{content:"";position:fixed;inset:-25%;pointer-events:none;z-index:0;background:radial-gradient(30% 36% at 34% 40%,rgba(255,255,255,.075),transparent 70%),radial-gradient(26% 32% at 66% 62%,rgba(255,255,255,.05),transparent 70%);animation:fxDrift 28s ease-in-out infinite alternate;animation-play-state:paused}
+.slide.active.fx-glow::before{animation-play-state:running}
+@keyframes fxDrift{from{transform:translate3d(-6%,-4%,0) rotate(0)}to{transform:translate3d(6%,5%,0) rotate(8deg)}}
+.slide.section.fx-glow::before{background:radial-gradient(34% 40% at 60% 55%,rgba(255,59,48,.12),transparent 70%)}
+@keyframes blink{50%{opacity:0}}
+.caret{display:inline-block;width:.1em;height:1em;background:var(--white);vertical-align:-.12em;margin-left:.06em;animation:blink 1s steps(1) infinite}
+
+/* 데모: 슬라이더 실험실 */
+.lab{display:grid;grid-template-columns:minmax(0,8fr) minmax(0,4fr);gap:calc(var(--s) * 56);margin-top:calc(var(--s) * 36);align-items:stretch}
+.stage{position:relative;height:calc(var(--s) * 560);border:1px solid var(--line);border-radius:calc(var(--s) * 10);background:rgba(0,0,0,.35);overflow:hidden;cursor:none;touch-action:none}
+.stage canvas{position:absolute;inset:0;width:100%;height:100%}
+.stage .hint{position:absolute;left:0;right:0;bottom:calc(var(--s) * 20);text-align:center;font-weight:300;font-size:calc(var(--s) * 22);color:var(--sub);transition:opacity .6s}
+.ctrl{display:flex;flex-direction:column;justify-content:space-between}
+.ctrl .sl{margin-bottom:calc(var(--s) * 18)}
+.ctrl .lb{display:flex;justify-content:space-between;align-items:baseline;font-weight:700;font-size:calc(var(--s) * 32)}
+.ctrl .lb small{font-weight:300;font-size:calc(var(--s) * 20);color:var(--sub);margin-left:calc(var(--s) * 12);letter-spacing:.08em}
+.ctrl .lb i{font-style:normal;font-weight:500;font-size:calc(var(--s) * 26);color:var(--sub);font-variant-numeric:tabular-nums}
+.ctrl .sc{border-top:1px solid var(--line);padding-top:calc(var(--s) * 22)}
+.sc .big{font-weight:800;font-size:calc(var(--s) * 104);line-height:1;letter-spacing:-.03em;font-variant-numeric:tabular-nums;transition:color .4s}
+.sc .big.low{color:var(--red)}
+.sc .st{font-weight:500;font-size:calc(var(--s) * 28);color:var(--sub);margin:calc(var(--s) * 10) 0 calc(var(--s) * 18)}
+.sc .st.low{color:var(--red)}
+
+/* 선형 모델 */
+.chain{position:relative;display:flex;justify-content:space-between;align-items:center;margin:calc(var(--s) * 64) 0 calc(var(--s) * 30)}
+.chain .node{position:relative;flex:none;width:calc(var(--s) * 220);height:calc(var(--s) * 120);border:1px solid #636366;border-radius:calc(var(--s) * 10);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:calc(var(--s) * 34);background:rgba(0,0,0,.3)}
+.chain .node.end{background:#fff;color:#0E0E10;border-color:#fff}
+.chain .link{flex:1;height:1px;background:linear-gradient(90deg,#636366,#636366);position:relative}
+.chain .noise{position:absolute;left:50%;top:calc(var(--s) * 140);transform:translateX(-50%);font-weight:500;font-size:calc(var(--s) * 24);color:var(--red);letter-spacing:.1em;white-space:nowrap}
+.packet{position:absolute;top:50%;left:0;transform:translate(0,-50%);z-index:3;background:var(--red);color:#fff;font-weight:800;font-size:calc(var(--s) * 34);padding:calc(var(--s) * 10) calc(var(--s) * 22);border-radius:999px;opacity:0;white-space:nowrap}
+.recv{font-weight:800;font-size:calc(var(--s) * 56);min-height:calc(var(--s) * 80);margin-top:calc(var(--s) * 16);letter-spacing:-.01em}
+.recv small{font-weight:300;font-size:calc(var(--s) * 24);color:var(--sub);margin-right:calc(var(--s) * 16);letter-spacing:.1em}
+
+/* 터미널 */
+.term{border:1px solid var(--line);border-radius:calc(var(--s) * 10);background:rgba(0,0,0,.45);padding:calc(var(--s) * 36) calc(var(--s) * 40);height:calc(var(--s) * 520);overflow:hidden;font-weight:500;font-size:calc(var(--s) * 34);line-height:1.9}
+.term .who{display:inline-block;width:calc(var(--s) * 170);color:var(--sub);font-weight:300;font-size:calc(var(--s) * 24);letter-spacing:.08em}
+.term .ln.sys{color:var(--body);font-weight:300}
+.term .gap{height:calc(var(--s) * 26)}
+
+/* 에이전틱 비교 */
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:calc(var(--s) * 56);margin-top:calc(var(--s) * 44)}
+.panel{border:1px solid var(--line);border-radius:calc(var(--s) * 10);padding:calc(var(--s) * 34) calc(var(--s) * 38);height:calc(var(--s) * 560);position:relative;overflow:hidden;background:rgba(0,0,0,.3)}
+.panel h3{font-weight:800;font-size:calc(var(--s) * 40);margin-bottom:calc(var(--s) * 6)}
+.panel h3 small{font-weight:300;font-size:calc(var(--s) * 22);color:var(--sub);margin-left:calc(var(--s) * 14);letter-spacing:.08em}
+.panel .logs{margin-top:calc(var(--s) * 28);font-size:calc(var(--s) * 28);line-height:1.9;font-weight:300;color:var(--body)}
+.panel .logs b{font-weight:700;display:inline-block;width:calc(var(--s) * 96)}
+.panel .logs .ask{color:#fff;font-weight:500}
+.panel .idle{margin-top:calc(var(--s) * 40);font-weight:300;font-size:calc(var(--s) * 34);color:var(--sub)}
+.panel .btn{position:absolute;left:calc(var(--s) * 38);bottom:calc(var(--s) * 34)}
+.panel .out{margin-top:calc(var(--s) * 22);font-size:calc(var(--s) * 30);line-height:1.7;font-weight:300;color:var(--body)}
+.ring{position:absolute;right:calc(var(--s) * 38);top:calc(var(--s) * 34);width:calc(var(--s) * 64);height:calc(var(--s) * 64)}
+.ring svg{width:100%;height:100%;animation:spin 2.4s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.panel .lg{animation:fxUp .5s var(--ease) backwards}
+
+/* 개념도 패널 */
+.pane{border-top:1px solid var(--line);padding-top:calc(var(--s) * 28);min-height:calc(var(--s) * 300)}
+.pane .nm{font-weight:800;font-size:calc(var(--s) * 72);line-height:1.1;letter-spacing:-.02em}
+.pane .en{font-weight:300;font-size:calc(var(--s) * 26);color:var(--sub);letter-spacing:.1em;margin:calc(var(--s) * 10) 0 calc(var(--s) * 22)}
+.pane .tx{font-weight:300;font-size:calc(var(--s) * 32);line-height:1.65;color:var(--body)}
+.sv .nodeg{cursor:pointer}
+.sv .nodeg rect{fill:rgba(0,0,0,.35);stroke:#636366;stroke-width:1.5;transition:stroke .4s,fill .4s}
+.sv .nodeg text{fill:#fff;transition:fill .4s}
+.sv .nodeg.on rect{stroke:#FF3B30;fill:rgba(255,59,48,.12);stroke-width:2.5}
+.sv .nodeg.on text.t{fill:#FF3B30}
+
+/* 네트워크 */
+.netwrap{position:relative;margin-top:calc(var(--s) * 10)}
+.netwrap canvas{width:100%;height:calc(var(--s) * 520);display:block}
+.counts{display:flex;gap:calc(var(--s) * 120);margin-top:calc(var(--s) * 8)}
+.counts .c{font-weight:800;font-size:calc(var(--s) * 92);line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.counts .l{font-weight:300;font-size:calc(var(--s) * 24);color:var(--sub);margin-top:calc(var(--s) * 8);letter-spacing:.08em}
+
+/* 소멸 */
+.vline{font-weight:800;line-height:1.2;letter-spacing:-.03em;white-space:nowrap;display:flex;justify-content:center;align-items:baseline}
+.vline.m{font-size:calc(var(--s) * 160)}
+.vline.s{font-size:calc(var(--s) * 72);color:var(--body);margin-top:calc(var(--s) * 18)}
+.gone{display:inline-block;white-space:nowrap;transition:width 1.1s .9s var(--ease),margin 1.1s .9s var(--ease)}
+.gone .ch{display:inline-block;transition:transform 1.3s var(--ease),opacity 1.1s ease,filter 1.1s ease}
+.gone.go .ch{transform:translate(var(--dx),var(--dy)) rotate(var(--rot));opacity:0;filter:blur(10px)}
+.gone.go{width:0 !important;margin-right:0 !important}
+.vline .sp{display:inline-block;width:.28em}
+.final{font-weight:800;font-size:calc(var(--s) * 96);margin-top:calc(var(--s) * 70);opacity:0;transform:translateY(calc(var(--s) * 30));transition:opacity 1.2s ease,transform 1.2s var(--ease)}
+.final.on{opacity:1;transform:none}
+.replay{margin-top:calc(var(--s) * 40)}
+
+/* 마지막 질문 */
+.qs{margin-top:calc(var(--s) * 36)}
+.q{display:grid;grid-template-columns:calc(var(--s) * 120) 1fr;align-items:baseline;border-top:1px solid var(--line);padding:calc(var(--s) * 20) 0}
+.q:last-child{border-bottom:1px solid var(--line)}
+.q .p{font-weight:500;font-size:calc(var(--s) * 24);color:var(--sub);letter-spacing:.1em}
+.q .t{font-weight:800;font-size:calc(var(--s) * 62);letter-spacing:-.02em}
+.q .t small{font-weight:300;font-size:calc(var(--s) * 26);color:var(--sub);margin-left:calc(var(--s) * 28);letter-spacing:0}
+
+.refs{margin-top:calc(var(--s) * 40);display:flex;flex-direction:column;gap:calc(var(--s) * 20)}
+.refs p{font-weight:300;font-size:calc(var(--s) * 25);line-height:1.55;color:var(--body);padding-left:calc(var(--s) * 48);text-indent:calc(var(--s) * -48)}
+.refs i{font-style:italic}
+
+/* 정의 슬라이드 */
+.bigword{font-weight:800;font-size:calc(var(--s) * 150);line-height:1.1;letter-spacing:-.03em;color:var(--red);min-height:calc(var(--s) * 170)}
+.defd{font-weight:300;font-size:calc(var(--s) * 34);line-height:1.6;color:var(--body);margin-top:calc(var(--s) * 20);min-height:calc(var(--s) * 160)}
+.defw{font-weight:500;font-size:calc(var(--s) * 26);color:var(--sub);letter-spacing:.08em;margin-top:calc(var(--s) * 14)}
+.defrows .row{grid-template-columns:calc(var(--s) * 120) 1fr;cursor:pointer;transition:opacity .35s;opacity:.38;padding:calc(var(--s) * 20) 0}
+.defrows .row.on{opacity:1}
+.defrows .row.on .t{color:#fff}
+.defrows .row .t{font-size:calc(var(--s) * 38)}
+.swap{transition:opacity .3s,transform .3s var(--ease)}
+.swap.out{opacity:0;transform:translateY(calc(var(--s) * 14))}
+
+/* UI */
+#bar{position:fixed;left:0;top:0;height:3px;width:100%;background:var(--red);transform-origin:left;transform:scaleX(0);z-index:20;transition:transform .5s var(--ease)}
+#counter{position:fixed;right:24px;bottom:16px;font-size:14px;color:#6E6E73;font-weight:300;letter-spacing:.06em;z-index:30;user-select:none;cursor:pointer;background:none;border:0}
+#counter:hover{color:#fff}
+.edge{position:fixed;top:0;bottom:0;width:7vw;z-index:10;cursor:pointer}
+.edge.l{left:0}.edge.r{right:0}
+.nav{position:fixed;left:24px;bottom:12px;z-index:30;display:flex;gap:14px}
+.nav button{background:none;border:0;color:#6E6E73;font-size:20px;cursor:pointer;padding:2px 6px;font-weight:300}
+.nav button:hover{color:#fff}
+#notes{position:fixed;left:0;right:0;bottom:0;max-height:38vh;overflow:auto;background:rgba(20,20,22,.95);color:#E5E5EA;font-size:17px;line-height:1.7;padding:20px 28px 44px;border-top:1px solid #2C2C2E;z-index:40;display:none}
+#notes.on{display:block}
+#notes b{color:var(--sub);font-weight:500;display:block;margin-bottom:6px;font-size:13px;letter-spacing:.08em}
+#index{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:50;display:none;padding:7vh 8vw;overflow:auto}
+#index.on{display:block}
+#index h4{font-weight:500;font-size:14px;letter-spacing:.14em;color:var(--sub);margin-bottom:20px}
+#index a{display:flex;gap:22px;padding:11px 4px;border-bottom:1px solid #2C2C2E;color:#E5E5EA;text-decoration:none;font-size:20px;font-weight:500;cursor:pointer}
+#index a i{font-style:normal;color:#636366;width:34px;font-weight:300}
+#index a:hover{background:rgba(255,255,255,.05)}
+.notes{display:none}
+
+@media (orientation:portrait){
+  :root{--s:calc(100vw / 1000);--padx:6vw;--pady:10vh}
+  .slide{justify-content:flex-start;overflow-y:auto}
+  .slide.center{justify-content:center}
+  .split,.figure,.lab,.duo,.cards.c3{grid-template-columns:1fr}
+  .row{grid-template-columns:calc(var(--s) * 110) 1fr}
+  .row .d{grid-column:2}
+  .chain{flex-direction:column;gap:calc(var(--s) * 20)}
+  .chain .link{width:1px;height:calc(var(--s) * 40);flex:none}
+  .title{font-size:calc(var(--s) * 120)}
+}
+@media (prefers-reduced-motion:reduce){
+  .slide.fx-play .fx,.slide.fx-play .fxf,.slide.fx-play .draw [pathLength],.slide.fx-play .fade{animation:none}
+  .fx-glow::before{animation:none}
+}
+</style>
+</head>
+<body>
+
+<!-- 1 · 제목 -->
+<section class="slide center fx-glow fx-light" data-init="title" data-title="Interactive Communication">
+  <canvas class="bgc"></canvas>
+  <div class="eyebrow fx">정동훈 · 광운대학교 미디어커뮤니케이션학부</div>
+  <h1 class="title fx"><span class="r">Interactive</span><br>Communication</h1>
+  <p class="lead fx" style="margin-top:calc(var(--s) * 44)">그 이름은 언제까지 필요할까</p>
+  <div class="notes">발표 도입. 마우스를 움직이면 점들이 반응한다. 이 발표 자체가 interactive라는 점을 먼저 체험시킨다. 논점: interactive communication의 정의와 AI와의 연결을 보고, 소통의 상대가 AI 에이전트가 되면 이 용어가 사라질 수도 있다는 점까지 이야기한다.</div>
+</section>
+
+<!-- 2 · 질문 -->
+<section class="slide center fx-glow fx-light" data-title="오늘의 질문">
+  <div class="eyebrow fx">오늘의 질문</div>
+  <h2 class="head xl fx">소통의 상대가<br><span class="r">AI</span>가 되어도</h2>
+  <p class="head fx" style="margin-top:calc(var(--s) * 56);font-weight:500">우리는 여전히 ‘<span class="r">상호작용적</span>’이라 불러야 할까?</p>
+  <div class="notes">정의, 계보, AI와의 연결, 용어의 운명의 네 부분으로 진행한다. 앞 세 부분은 자료에 근거한 설명이고 마지막 부분의 논증은 이 발표에서 세우는 가설이다.</div>
+</section>
+
+<!-- 3 · 섹션 01 -->
+<section class="slide section center fx-glow" data-title="01 · 정의">
+  <div class="eyebrow fx"><span class="badge">01</span>정의</div>
+  <h2 class="head xl fx">Interactive란<br><span class="r">무엇</span>인가</h2>
+  <div class="notes">정의 부분.</div>
+</section>
+
+<!-- 4 · 정의들 -->
+<section class="slide fx-light" data-init="defs" data-title="정의는 하나가 아니다">
+  <div class="eyebrow fx">01 · 정의는 하나가 아니다</div>
+  <div class="split">
+    <div class="fx">
+      <div class="bigword swap" id="dw">통제력</div>
+      <p class="defd swap" id="dd"></p>
+      <p class="defw swap" id="dwho"></p>
+    </div>
+    <div class="rows defrows fx">
+      <button class="row" data-k="통제력" data-w="Rice (1984)" data-d="실시간 또는 비동시적으로 커뮤니케이션의 속도, 구조, 내용에 대한 통제력을 갖는 것"><span class="p">1984</span><span class="t">Rice</span></button>
+      <button class="row" data-k="영향" data-w="Steuer (1992)" data-d="사용자가 매개된 환경의 형태와 내용에 영향을 줄 수 있는 정도"><span class="p">1992</span><span class="t">Steuer</span></button>
+      <button class="row" data-k="반응" data-w="Alba et al. (1997)" data-d="반응시간과 반응의 적절성"><span class="p">1997</span><span class="t">Alba et al.</span></button>
+      <button class="row" data-k="차원" data-w="Downes &amp; McMillan (2000)" data-d="상호작용성의 핵심 차원을 질적으로 규명"><span class="p">2000</span><span class="t">Downes &amp; McMillan</span></button>
+      <button class="row" data-k="조작" data-w="Coyle &amp; Thorson (2001)" data-d="좋은 매핑, 빠른 입출력 전환, 콘텐츠를 조작하는 다양한 방법"><span class="p">2001</span><span class="t">Coyle &amp; Thorson</span></button>
+      <button class="row" data-k="모든 행위" data-w="Lombard &amp; Snyder-Duch (2001)" data-d="인간과 인간 또는 인간과 사물 사이에 주고받는 모든 행위"><span class="p">2001</span><span class="t">Lombard &amp; Snyder-Duch</span></button>
+    </div>
+  </div>
+  <p class="take fx">여섯 개의 정의, 하나의 시선. 인간이 얼마나 <span class="r">통제</span>하는가.</p>
+  <p class="cite fx">출처: 『사용자 관점의 가상현실의 이해』 상호작용성 장(정동훈)</p>
+  <div class="notes">정의는 연구자마다 다르다. 이 정의들은 interactivity(상호작용성)에 대한 것이며 interactive communication을 직접 정의한 문장은 아니다. 공통의 시선(인간의 통제)은 정의들을 읽고 정리한 것으로 원문의 문장은 아니다. 이 시선은 이후 HCI의 직접 조작, 피드백은 통제 기제라는 비판과 이어진다. 행을 클릭하면 직접 고를 수 있다.</div>
+</section>
+
+<!-- 5 · 데모 -->
+<section class="slide fx-light" data-init="demo" data-title="상호작용성을 느껴 보세요">
+  <div class="eyebrow fx">01 · 직접 만져 보세요</div>
+  <h2 class="head fx">상호작용성은 <span class="r">느끼는</span> 것이다</h2>
+  <div class="lab fx">
+    <div class="stage"><canvas></canvas><div class="hint">마우스를 움직여 보세요</div></div>
+    <div class="ctrl">
+      <div>
+        <div class="sl"><div class="lb"><span>속도<small>speed</small></span><i id="vsp">90</i></div><input type="range" id="sp" min="0" max="100" value="90"></div>
+        <div class="sl"><div class="lb"><span>범위<small>range</small></span><i id="vrg">85</i></div><input type="range" id="rg" min="0" max="100" value="85"></div>
+        <div class="sl"><div class="lb"><span>매핑<small>mapping</small></span><i id="vmp">100</i></div><input type="range" id="mp" min="0" max="100" value="100"></div>
+      </div>
+      <div class="sc">
+        <div class="big" id="score">92</div>
+        <div class="st" id="status">살아 있다</div>
+        <button class="btn red" id="break">망가뜨리기</button>
+      </div>
+    </div>
+  </div>
+  <p class="cite fx">Steuer(1992): 속도 · 범위 · 매핑</p>
+  <div class="notes">Steuer의 세 요소를 학생이 직접 조절해 본다. 속도는 반응속도, 범위는 컨트롤 가능한 정도, 매핑은 의도한 대로 자연스럽게 조작되는 정도. 슬라이더를 낮추면 점이 늦게 따라오거나, 움직일 수 있는 범위가 좁아지거나, 방향이 뒤틀린다. 상호작용성이 낮아지면 매체가 죽어 있다고 느껴진다. 망가뜨리기 버튼으로 한 번에 낮출 수 있다.</div>
+</section>
+
+<!-- 6 · 섹션 02 -->
+<section class="slide section center fx-glow" data-title="02 · 계보">
+  <div class="eyebrow fx"><span class="badge">02</span>계보</div>
+  <h2 class="head xl fx">전송에서<br><span class="r">상호작용</span>으로</h2>
+  <div class="notes">커뮤니케이션 모델의 계보.</div>
+</section>
+
+<!-- 7 · 선형 -->
+<section class="slide fx-light" data-init="linear" data-title="소통은 전송이었다">
+  <div class="eyebrow fx">02 · 선형 모델</div>
+  <h2 class="head fx">소통은 <span class="r">전송</span>이었다</h2>
+  <div class="chain fx">
+    <div class="node end">정보원</div><div class="link"></div>
+    <div class="node">송신기</div><div class="link"></div>
+    <div class="node">채널</div><div class="link"></div>
+    <div class="node">수신기</div><div class="link"></div>
+    <div class="node end">목적지</div>
+    <div class="noise">▲ 잡음</div>
+    <div class="packet">사랑해</div>
+  </div>
+  <div class="recv fx" id="recv"></div>
+  <p class="take fx" style="margin-top:calc(var(--s) * 24)">실패의 원인은 <span class="r">잡음</span>이라는 기술적 문제였다.</p>
+  <div style="margin-top:calc(var(--s) * 24)"><button class="btn" id="send">▶ 다시 보내기</button></div>
+  <p class="cite fx">Shannon &amp; Weaver (1949) · Lasswell (1948) · Berlo (1960) — 『커뮤니케이션의 진화』 1장</p>
+  <div class="notes">선형 모델은 소통을 정보의 전송으로 보았다. 의미는 메시지에 고정되고 수신자는 수동적이다. 실패는 채널의 잡음 문제로 환원된다. 이 문법은 사라지지 않고 이후 인터페이스 설계의 언어로 살아남는다.</div>
+</section>
+
+<!-- 8 · 경험의 장 -->
+<section class="slide fx-light" data-init="overlap" data-title="경험의 장이 겹치는 만큼">
+  <div class="eyebrow fx">02 · 상호작용 모델</div>
+  <h2 class="head fx">경험의 장이 겹치는 만큼만, <span class="r">의미</span>가 공유된다</h2>
+  <div class="figure fx" style="grid-template-columns:minmax(0,8fr) minmax(0,3fr);margin-top:calc(var(--s) * 10)">
+    <svg id="ovsvg" viewBox="0 0 1200 600" style="touch-action:none;cursor:ew-resize">
+      <defs><clipPath id="clA"><circle id="clAc" cx="330" cy="300" r="220"/></clipPath></defs>
+      <circle id="ca" cx="330" cy="300" r="220" fill="rgba(255,255,255,.04)" stroke="#fff" stroke-width="2"/>
+      <circle id="cb" cx="700" cy="300" r="220" fill="rgba(255,255,255,.04)" stroke="#A1A1A6" stroke-width="2"/>
+      <circle id="lens" cx="700" cy="300" r="220" fill="rgba(255,59,48,.55)" clip-path="url(#clA)"/>
+      <text id="ta" x="330" y="300" text-anchor="middle" fill="#fff" font-size="30" font-weight="700">송신자</text>
+      <text id="ta2" x="330" y="338" text-anchor="middle" fill="#A1A1A6" font-size="22" font-weight="300">경험의 장</text>
+      <text id="tb" x="700" y="300" text-anchor="middle" fill="#fff" font-size="30" font-weight="700">수신자</text>
+      <text id="tb2" x="700" y="338" text-anchor="middle" fill="#A1A1A6" font-size="22" font-weight="300">경험의 장</text>
+      <path id="pTop" d="M330 40 Q515 -10 700 40" fill="none" stroke="#3A3A3C" stroke-width="2" stroke-dasharray="6 8"/>
+      <path id="pBot" d="M700 560 Q515 610 330 560" fill="none" stroke="#3A3A3C" stroke-width="2" stroke-dasharray="6 8"/>
+      <circle id="d1" r="9" fill="#FF3B30"/><circle id="d2" r="9" fill="#fff"/>
+      <text id="lt" x="515" y="22" text-anchor="middle" fill="#A1A1A6" font-size="20" font-weight="300">부호화 → 해독</text>
+      <text id="lb" x="515" y="596" text-anchor="middle" fill="#A1A1A6" font-size="20" font-weight="300">피드백</text>
+    </svg>
+    <div>
+      <div class="eyebrow" style="margin-bottom:calc(var(--s) * 6)">의미 공유</div>
+      <div class="counts"><div><div class="c r" id="pct">41%</div></div></div>
+      <p class="cite" style="margin-top:calc(var(--s) * 28)">마우스를 좌우로 움직여 보세요</p>
+    </div>
+  </div>
+  <p class="take fx" style="margin-top:calc(var(--s) * 44);font-size:calc(var(--s) * 30);color:var(--body);font-weight:300">Schramm 순환 · Newcomb 공동 지향 · Dance 나선 · Palo Alto 내용과 관계</p>
+  <p class="cite fx">Schramm (1954) — 『커뮤니케이션의 진화』 2장</p>
+  <div class="notes">Schramm의 경험의 장 개념. 신호가 물리적으로 도달해도 두 사람의 경험의 장이 겹치지 않으면 의미는 살아나지 않는다. 실패의 원인이 기술적 잡음에서 맥락의 불일치로 옮겨 갔다. 송신자와 수신자는 고정된 위치가 아니라 순환적으로 교대되는 역할이다. 학생이 마우스로 수신자의 경험의 장을 움직이며 겹침 비율을 확인한다. Newcomb은 공동 지향, Dance는 나선(순환하되 누적), Palo Alto는 내용과 관계의 이중 차원을 더했다.</div>
+</section>
+
+<!-- 9 · 한계 -->
+<section class="slide fx-light" data-title="세 가지 한계">
+  <div class="eyebrow fx">02 · 비판</div>
+  <h2 class="head fx">그러나 <span class="r">세 가지</span> 한계가 있었다</h2>
+  <div class="rows">
+    <div class="row fx"><span class="p">01</span><span class="t">피드백은 <span class="r">통제</span>의 연장</span><span class="d">수신자의 목소리처럼 보였지만, 발신자의 의도를 확인하고 교정하는 장치였다</span></div>
+    <div class="row fx"><span class="p">02</span><span class="t"><span class="r">동시성</span>의 누락</span><span class="d">실제 소통은 말하는 동시에 상대를 읽고 수정한다</span></div>
+    <div class="row fx"><span class="p">03</span><span class="t"><span class="r">의미</span>의 위치</span><span class="d">의미를 개인 내부에 두어 매체와 구조의 작동을 이론에 넣지 못했다</span></div>
+  </div>
+  <p class="take fx">교류·수렴 모델이 동시성과 ‘목적에 충분한 <span class="r">수렴</span>’으로 보완했다.</p>
+  <p class="cite fx">van Ruler (2018) · Littlejohn et al. (2017) · Barnlund (1970) · Kincaid (1979) — 『커뮤니케이션의 진화』 2, 4장</p>
+  <div class="notes">특히 첫째 한계가 중요하다. 피드백이 통제 기제의 연장이라는 비판은, 이후 HCI에서 피드백이 사용자 통제 수단으로만 설계된 역사와 이어진다. 앞서 본 정의들이 통제에 초점을 둔 것과도 맞닿는다.</div>
+</section>
+
+<!-- 10 · 섹션 03 -->
+<section class="slide section center fx-glow" data-title="03 · AI와의 연결">
+  <div class="eyebrow fx"><span class="badge">03</span>AI와의 연결</div>
+  <h2 class="head xl fx">통제에서<br><span class="r">대화</span>로</h2>
+  <div class="notes">AI와의 연결 부분.</div>
+</section>
+
+<!-- 11 · HCI -->
+<section class="slide theory fx-light" data-init="hci" data-title="HCI는 통제를 설계했다">
+  <div class="eyebrow fx">03 · HCI</div>
+  <div class="split">
+    <div>
+      <h2 class="head xl fx">명령하고,<br><span class="r">통제</span>한다</h2>
+      <p class="lead fx">직접 조작은 통제감을 설계의 최고 가치로 삼았다. 대화 은유는 알면서 기각되었다.</p>
+    </div>
+    <div class="term fx" id="term"></div>
+  </div>
+  <p class="take fx">문제는 이 도식이 자율적 행위자 앞에서 <span class="r">무너진다</span>는 점이다.</p>
+  <p class="cite fx">Shneiderman (1983) · Hutchins et al. (1985) · Licklider (1960) — 『커뮤니케이션의 진화』 5장</p>
+  <div class="notes">HCI는 컴퓨터를 지적 파트너로 상상한 비전(Licklider, Engelbart)에서 태어났지만, 분야를 지배한 것은 직접 조작 원칙이었다. 명령 입력, 결과 출력의 선형 도식이 설계 규범이 되었다. 생성형 AI의 프롬프트 입력창은 겉보기에 이 도식의 부활이다. 그러나 에이전틱 AI 앞에서는 무너진다.</div>
+</section>
+
+<!-- 12 · 에이전틱 -->
+<section class="slide fx-light" data-init="agentic" data-title="기다리는 AI와 움직이는 AI">
+  <div class="eyebrow fx">03 · 에이전틱 AI</div>
+  <h2 class="head fx">기다리는 AI, <span class="r">움직이는</span> AI</h2>
+  <div class="duo fx">
+    <div class="panel" id="pg">
+      <h3>생성형 AI<small>입력 → 출력</small></h3>
+      <div class="idle" id="idle">입력을 기다리는 중<span class="caret"></span></div>
+      <div class="out" id="gout"></div>
+      <button class="btn" id="gbtn">프롬프트 보내기</button>
+    </div>
+    <div class="panel" id="pa">
+      <h3><span class="r">에이전틱</span> AI<small>지각 · 추론 · 계획 · 행동 · 성찰</small></h3>
+      <div class="ring"><svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="26" fill="none" stroke="#3A3A3C" stroke-width="3"/><path d="M32 6 A26 26 0 0 1 58 32" fill="none" stroke="#FF3B30" stroke-width="3" stroke-linecap="round"/></svg></div>
+      <div class="logs" id="logs"></div>
+    </div>
+  </div>
+  <p class="cite fx">『커뮤니케이션의 진화』 9, 10장 (Yao et al., 2023; Shinn et al., 2023)</p>
+  <div class="notes">생성형 AI는 프롬프트를 기다린다. 에이전틱 AI는 지각, 추론, 계획, 행동, 성찰의 자율적 순환으로 작동하며, 목표를 스스로 분해하고 필요할 때 사람에게 되묻는다. 오른쪽 패널은 계속 스스로 돌며 먼저 질문을 던진다. 왼쪽은 버튼을 눌러야 반응한다.</div>
+</section>
+
+<!-- 13 · SACM -->
+<section class="slide theory fx-light" data-init="sacm" data-title="SACM: 발신자로서의 AI">
+  <div class="eyebrow fx">03 · 구조 모델 SACM</div>
+  <h2 class="head fx">AI는 채널이 아니라 <span class="r">발신자</span>다</h2>
+  <div class="figure sv" style="grid-template-columns:minmax(0,8fr) minmax(0,4fr)">
+    <svg id="sacmsvg" viewBox="0 0 1100 560" class="draw">
+      <g class="fade" style="--d:.2s"><rect x="10" y="150" width="210" height="250" rx="10" fill="rgba(0,0,0,.35)" stroke="#636366" stroke-width="1.5"/>
+      <text x="115" y="262" text-anchor="middle" fill="#fff" font-size="34" font-weight="800">인간</text>
+      <text x="115" y="302" text-anchor="middle" fill="#A1A1A6" font-size="20" font-weight="300">행위자 · 발신자</text></g>
+      <g class="fade" style="--d:.5s"><rect x="880" y="150" width="210" height="250" rx="10" fill="rgba(0,0,0,.35)" stroke="#636366" stroke-width="1.5"/>
+      <text x="985" y="262" text-anchor="middle" fill="#fff" font-size="34" font-weight="800">에이전틱 AI</text>
+      <text x="985" y="302" text-anchor="middle" fill="#A1A1A6" font-size="20" font-weight="300">행위자 · 발신자</text></g>
+      <path d="M270 60 H830" pathLength="1" fill="none" stroke="#fff" stroke-width="2" style="--d:.7s"/>
+      <path d="M270 60 l14 -9 M270 60 l14 9 M830 60 l-14 -9 M830 60 l-14 9" stroke="#fff" stroke-width="2" class="fade" style="--d:1.6s"/>
+      <text x="550" y="40" text-anchor="middle" fill="#A1A1A6" font-size="22" font-weight="300" class="fade" style="--d:1.2s">공동의 목표와 맥락</text>
+      <path d="M270 500 H830" pathLength="1" fill="none" stroke="#fff" stroke-width="2" style="--d:.9s"/>
+      <path d="M270 500 l14 -9 M270 500 l14 9 M830 500 l-14 -9 M830 500 l-14 9" stroke="#fff" stroke-width="2" class="fade" style="--d:1.8s"/>
+      <g class="nodeg fade on" data-i="0" style="--d:.9s"><rect x="270" y="110" width="560" height="150" rx="10"/>
+        <text class="t" x="550" y="178" text-anchor="middle" font-size="42" font-weight="800">공유된 행위자성</text>
+        <text x="550" y="222" text-anchor="middle" fill="#A1A1A6" font-size="22" font-weight="300">shared agency</text></g>
+      <g class="nodeg fade" data-i="1" style="--d:1.1s"><rect x="270" y="290" width="270" height="130" rx="10"/>
+        <text class="t" x="405" y="350" text-anchor="middle" font-size="32" font-weight="800">사회적 단서</text>
+        <text x="405" y="388" text-anchor="middle" fill="#A1A1A6" font-size="20" font-weight="300">social cues</text></g>
+      <g class="nodeg fade" data-i="2" style="--d:1.3s"><rect x="560" y="290" width="270" height="130" rx="10"/>
+        <text class="t" x="695" y="350" text-anchor="middle" font-size="32" font-weight="800">상호 호혜성</text>
+        <text x="695" y="388" text-anchor="middle" fill="#A1A1A6" font-size="20" font-weight="300">reciprocity</text></g>
+    </svg>
+    <div class="pane fx"><div class="nm" id="sn">공유된 행위자성</div><div class="en" id="se">shared agency</div><p class="tx" id="st">목표와 계획 수준에서 공동의 목표를 함께 만든다. 그 안에 책임 추적성이 들어 있다.</p></div>
+  </div>
+  <p class="take fx" style="margin-top:calc(var(--s) * 10)">발신자 지위는 <span class="r">대칭</span>, 책임은 <span class="r">비대칭</span>.</p>
+  <p class="cite fx">정동훈(2026), 정보화정책 33(1) · 『커뮤니케이션의 진화』 14장</p>
+  <div class="notes">SACM은 AI를 채널의 자리에서 발신자의 자리로 옮기는 구조 모델이다. 상호작용의 질을 결정하는 세 변인은 공유된 행위자성, 사회적 단서, 상호 호혜성. 소통의 결과는 추적과 소급의 경로를 따라 인간과 기관에 도달해야 한다는 책임 추적성이 발신자 지위의 대칭과 책임의 비대칭을 만든다. 박스를 클릭하거나 가리키면 설명이 바뀐다.</div>
+</section>
+
+<!-- 14 · DIAL -->
+<section class="slide theory fx-light" data-init="dial" data-title="DIAL: 공진화 루프">
+  <div class="eyebrow fx">03 · 과정 모델 DIAL</div>
+  <h2 class="head fx">주도권이 고정되지 않은 <span class="r">루프</span></h2>
+  <div class="figure sv" style="grid-template-columns:minmax(0,7fr) minmax(0,5fr);margin-top:calc(var(--s) * 10)">
+    <svg id="dialsvg" viewBox="0 0 800 640" class="fx"></svg>
+    <div class="pane fx"><div class="nm" id="dn">시작</div><div class="en" id="de">initiate</div><p class="tx" id="dt"></p></div>
+  </div>
+  <p class="cite fx">정동훈(2026), 정보화정책 33(1) · 『커뮤니케이션의 진화』 15장 (Bainbridge, 1983; Endsley, 2023)</p>
+  <div class="notes">DIAL은 자동화의 역설이 AI 환경에서 재발할 위험에 대한 과정 모델의 응답이다. 시작-제안-평가-정제-통합의 다섯 단계(IPERI)가 비선형으로 순환하며 주도권이 고정되지 않는다. 인간은 감시자가 아니라 전략적 지휘자다. 피드백이 한쪽이 다른 쪽을 교정하는 신호에서 양쪽이 함께 변하는 매개로 바뀐다. 노드를 클릭하면 단계 설명이 나온다.</div>
+</section>
+
+<!-- 15 · 두 개의 루프 -->
+<section class="slide theory fx-light" data-init="loops" data-title="두 개의 루프">
+  <div class="eyebrow fx">03 · 층위</div>
+  <h2 class="head fx">기계 안의 순환, <span class="r">인간과 AI</span>의 순환</h2>
+  <svg id="loopsvg" viewBox="0 0 1500 600" style="width:100%;height:auto;max-height:calc(var(--s) * 640);margin-top:calc(var(--s) * 10)" class="fx"></svg>
+  <p class="take fx" style="margin-top:calc(var(--s) * 8)">같은 것의 두 이름이 아니다. 서로 다른 <span class="r">층위</span>의 순환이다.</p>
+  <p class="cite fx">『커뮤니케이션의 진화』 그림 10-1</p>
+  <div class="notes">왼쪽은 단일 에이전트 내부의 자율적 인지 루프(지각-추론-계획-행동-성찰), 오른쪽은 인간과 에이전틱 AI 사이의 IPERI 루프다. 왼쪽 루프는 오른쪽 루프의 제안과 정제 단계 안에서 여러 차례 회전한다. 오른쪽의 제안 또는 정제 단계에서 왼쪽이 붉게 켜진다.</div>
+</section>
+
+<!-- 16 · 섹션 04 -->
+<section class="slide section center fx-glow" data-title="04 · 용어의 운명">
+  <div class="eyebrow fx"><span class="badge">04</span>용어의 운명</div>
+  <h2 class="head xl fx">이름은<br>어떻게 <span class="r">될까</span></h2>
+  <div class="notes">여기서부터는 자료의 결론이 아니라 이 발표에서 세우는 가설이다.</div>
+</section>
+
+<!-- 17 · 세 전제 -->
+<section class="slide fx-light" data-init="premise" data-title="세 전제가 재구성된다">
+  <div class="eyebrow fx">04 · 세 가지 전제</div>
+  <h2 class="head fx">‘상호작용’을 떠받치던 전제가 <span class="r">흔들린다</span></h2>
+  <div class="cards c3">
+    <div class="card fx"><span class="n">전제 1</span><span class="k"><s class="st">인간 주체의 독점</s></span><span class="v">SACM. 발신자 지위는 대칭, 책임은 비대칭.</span><span class="res">분할</span></div>
+    <div class="card fx"><span class="n">전제 2</span><span class="k"><s class="st">도구적 매체</s></span><span class="v">채널에서 능동적 매개자를 거쳐 발신자로.</span><span class="res">기각</span></div>
+    <div class="card fx"><span class="n">전제 3</span><span class="k"><s class="st">통제 기제로서의 피드백</s></span><span class="v">RLHF의 방향 전환, DIAL의 평가와 정제 루프.</span><span class="res">전환</span></div>
+  </div>
+  <p class="take fx">셋 중 어느 것도 단순히 폐기되지 않았다. 모두 <span class="r">재구성</span>되었다.</p>
+  <p class="cite fx">『커뮤니케이션의 진화』 맺음말 표 E-1</p>
+  <div class="notes">interactive communication이라는 이름은 사실상 이 세 전제 위에 있었다. 인간만 소통하고, 기술은 통로이며, 피드백은 통제라는 전제다. 카드에 그어진 선은 전제의 폐기가 아니라 재구성을 뜻한다.</div>
+</section>
+
+<!-- 18 · 네트워크 -->
+<section class="slide fx-light" data-init="network" data-title="소통의 상대는 인간만이 아니다">
+  <div class="eyebrow fx">04 · 인간-AI, AI-AI</div>
+  <h2 class="head fx">소통의 상대는 <span class="r">인간만</span>이 아니다</h2>
+  <div class="netwrap fx"><canvas id="netc"></canvas></div>
+  <div class="counts fx">
+    <div><div class="c r" id="n_aa">0</div><div class="l">AI ↔ AI</div></div>
+    <div><div class="c" id="n_ha">0</div><div class="l">인간 ↔ AI</div></div>
+  </div>
+  <p class="cite fx">에이전트들은 사람의 언어로 역할을 나누고, 중간 결과를 보고하고, 이견을 조정한다 — 『커뮤니케이션의 진화』 10장, 맺음말</p>
+  <div class="notes">에이전트 간 통신 자체는 다중 에이전트 시스템 연구가 수십 년 다뤄 왔다. 새로운 것은 교신이 형식 규약이 아니라 자연어로 이루어질 수 있게 되었다는 점이다. 인간-기계 소통은 커뮤니케이션학의 새 영토가 아니라 다른 종류의 존재 사이에서 소통의 가능성과 한계가 가장 선명히 드러나는 형태다(Peters, 1999). 캔버스는 개념적 시연이며 실제 통신량이 아니다.</div>
+</section>
+
+<!-- 19 · 소멸 -->
+<section class="slide center fx-glow fx-light" data-init="vanish" data-title="사라질 수도 있다">
+  <div class="eyebrow fx">04 · 가설</div>
+  <div class="vline m"><span class="gone r" data-ch="interactive">interactive</span><span class="sp"></span><span>communication</span></div>
+  <div class="vline s"><span class="gone" data-ch="digital">digital</span><span class="sp"></span><span>media</span><span style="width:.9em"></span><span class="gone" data-ch="e-">e-</span><span>mail</span></div>
+  <div class="final" id="final">사라질 <span class="r">수도</span> 있다</div>
+  <div class="replay"><button class="btn" id="replay">↻ 다시 보기</button></div>
+  <p class="cite fx">이 논증은 자료의 결론이 아니라 이 발표에서 세우는 가설이다</p>
+  <div class="notes">논증 흐름. 1) interactive는 일방향 매체와 구별하려고 붙인 수식어였다. 2) 소통의 상대가 에이전트가 되면 소통은 기본값이 상호작용이다. 3) 대비할 대상이 없어지면 수식어도 변별력을 잃는다. digital media, e-mail이 media, mail로 불리게 된 경로와 닮았다. 4) 남는 물음은 누가 말하는가, 책임은 누구에게 있는가이며 SACM과 DIAL이 이를 다룬다. 결론의 강도는 사라질 수도 있다로 열어 둔다. 화면을 클릭하거나 다시 보기를 누르면 재생된다.</div>
+</section>
+
+<!-- 20 · 남는 물음 -->
+<section class="slide section fx-glow" data-title="이름이 사라져도 남는 물음">
+  <div class="eyebrow fx">이름이 사라져도 남는 물음</div>
+  <div class="qs">
+    <div class="q fx"><span class="p">01</span><span class="t"><span class="r">누가</span> 말하는가<small>소통의 주체와 발신자의 자격</small></span></div>
+    <div class="q fx"><span class="p">02</span><span class="t"><span class="r">의미</span>는 어디에 있는가<small>메시지, 사람, 관계, 혹은 둘 사이의 과정</small></span></div>
+    <div class="q fx"><span class="p">03</span><span class="t"><span class="r">통제</span>와 <span class="r">협력</span>은 어떻게 다른가<small>도구의 사용과 소통의 차이</small></span></div>
+    <div class="q fx"><span class="p">04</span><span class="t"><span class="r">책임</span>은 누구에게 있는가<small>발신의 자격은 나누어도 책임은 추적되어야 한다</small></span></div>
+  </div>
+  <p class="take fx" style="margin-top:calc(var(--s) * 44)">Interactive communication은 사라질 수도 있다. 그러나 이 질문들은 <span class="r">남는다</span>.</p>
+  <div class="notes">맺음말. 기술은 빨리 낡지만 이 물음들은 낡지 않는다는 책의 문제의식으로 닫는다.</div>
+</section>
+
+<!-- 21 · 참고문헌 -->
+<section class="slide theory fx-light" data-title="참고문헌">
+  <div class="eyebrow fx">REFERENCES</div>
+  <div class="refs fx">
+    <p>정동훈 (2026). 에이전틱 AI 시대의 인간-기계 상호작용 재구성에 관한 이론적 고찰. <i>정보화정책</i>, 33(1), 3–24.</p>
+    <p>정동훈 (집필 중). <i>커뮤니케이션의 진화: 인간 간 소통에서 에이전틱 AI 협업으로.</i></p>
+    <p>정동훈. 상호작용성. <i>사용자 관점의 가상현실의 이해</i> (상호작용성 정의: Rice, 1984; Steuer, 1992; Alba et al., 1997; Downes &amp; McMillan, 2000; Coyle &amp; Thorson, 2001; Lombard &amp; Snyder-Duch, 2001).</p>
+    <p>Schramm, W. (1954). How communication works. In W. Schramm (Ed.), <i>The process and effects of mass communication</i> (pp. 3–26). University of Illinois Press.</p>
+    <p>Shannon, C. E., &amp; Weaver, W. (1949). <i>The mathematical theory of communication.</i> University of Illinois Press.</p>
+    <p>Newcomb, T. M. (1953). An approach to the study of communicative acts. <i>Psychological Review, 60</i>(6), 393–404.</p>
+    <p>Nass, C., Steuer, J., &amp; Tauber, E. R. (1994). Computers are social actors. In <i>CHI ’94</i> (pp. 72–78). ACM.</p>
+    <p>Bratman, M. E. (1992). Shared cooperative activity. <i>The Philosophical Review, 101</i>(2), 327–341.</p>
+    <p>Peters, J. D. (1999). <i>Speaking into the air: A history of the idea of communication.</i> University of Chicago Press.</p>
+  </div>
+  <div class="notes">1, 2번이 이 발표의 주된 소스다. 3번의 정의 출처 서지(출판연도, 출판사)는 확인 후 보완이 필요하다.</div>
+</section>
+
+<div id="bar"></div>
+<div class="edge l" id="eL" title="이전"></div><div class="edge r" id="eR" title="다음"></div>
+<div class="nav"><button id="bPrev" aria-label="이전">‹</button><button id="bNext" aria-label="다음">›</button></div>
+<button id="counter" aria-label="목차">1 / 1</button>
+<div id="notes"></div>
+<div id="index"></div>
+
+<script>
+(function(){
+'use strict';
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)), lerp=(a,b,t)=>a+(b-a)*t;
+function raf(fn){let id,run=true,t0=null,last=0;const f=t=>{if(!run)return;if(t0===null){t0=t;last=t}fn(t-t0,t-last);last=t;id=requestAnimationFrame(f)};id=requestAnimationFrame(f);return()=>{run=false;cancelAnimationFrame(id)}}
+function fitCanvas(cv){const dpr=Math.min(2,devicePixelRatio||1);const r=cv.getBoundingClientRect();const w=Math.max(1,r.width),h=Math.max(1,r.height);cv.width=Math.round(w*dpr);cv.height=Math.round(h*dpr);const c=cv.getContext('2d');c.setTransform(dpr,0,0,dpr,0,0);return{ctx:c,w,h}}
+
+/* ───── 네비게이션 ───── */
+const slides=$$('.slide');
+slides.forEach(s=>{$$('.fx,.fxf',s).forEach((e,i)=>e.style.setProperty('--i',i))});
+const modules={}; let cur=-1;
+const notesEl=$('#notes'), idxEl=$('#index'), bar=$('#bar'), counter=$('#counter');
+function go(n){
+  n=clamp(n,0,slides.length-1); if(n===cur)return;
+  const old=slides[cur];
+  if(old){old.classList.remove('active','fx-play');const m=modules[old.dataset.init];m&&m.stop&&m.stop(old)}
+  cur=n; const s=slides[n];
+  s.classList.add('active'); void s.offsetWidth; s.classList.add('fx-play');
+  const m=modules[s.dataset.init]; m&&m.start&&m.start(s);
+  counter.textContent=(n+1)+' / '+slides.length;
+  bar.style.transform='scaleX('+((n+1)/slides.length)+')';
+  const nt=$('.notes',s); notesEl.innerHTML='<b>발표자 노트</b>'+(nt?nt.innerHTML:'');
+  history.replaceState(null,'','#'+(n+1));
+}
+const next=()=>go(cur+1), prev=()=>go(cur-1);
+addEventListener('keydown',e=>{
+  const tg=e.target&&e.target.tagName;
+  if(idxEl.classList.contains('on')){if(e.key==='Escape'||e.key==='g'||e.key==='G')toggleIndex();return}
+  if(tg==='INPUT'&&(e.key.startsWith('Arrow')||e.key==='Home'||e.key==='End')&&e.key!=='ArrowRight'&&e.key!=='ArrowLeft')return;
+  if(tg==='INPUT'&&(e.key==='ArrowRight'||e.key==='ArrowLeft'))return;
+  switch(e.key){
+    case 'ArrowRight':case 'PageDown':case 'ArrowDown':next();e.preventDefault();break;
+    case ' ':case 'Enter':if(tg==='BUTTON')return;next();e.preventDefault();break;
+    case 'ArrowLeft':case 'PageUp':case 'ArrowUp':prev();e.preventDefault();break;
+    case 'Home':go(0);break; case 'End':go(slides.length-1);break;
+    case 'n':case 'N':notesEl.classList.toggle('on');break;
+    case 'g':case 'G':toggleIndex();break;
+    case 'f':case 'F':if(!document.fullscreenElement)document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen();else document.exitFullscreen();break;
+  }
+});
+$('#eR').onclick=next; $('#eL').onclick=prev; $('#bNext').onclick=next; $('#bPrev').onclick=prev;
+let tx0=null; addEventListener('touchstart',e=>{tx0=e.touches[0].clientX},{passive:true});
+addEventListener('touchend',e=>{if(tx0===null)return;const dx=e.changedTouches[0].clientX-tx0;if(Math.abs(dx)>60)(dx<0?next:prev)();tx0=null});
+addEventListener('pointermove',e=>{const s=slides[cur];if(!s)return;s.style.setProperty('--mx',e.clientX+'px');s.style.setProperty('--my',e.clientY+'px')});
+function toggleIndex(){
+  if(!idxEl.classList.contains('on')){idxEl.innerHTML='<h4>목차</h4>'+slides.map((s,i)=>'<a data-n="'+i+'"><i>'+(i+1)+'</i>'+(s.dataset.title||'')+'</a>').join('');
+    $$('a',idxEl).forEach(a=>a.onclick=()=>{toggleIndex();go(+a.dataset.n)})}
+  idxEl.classList.toggle('on');
+}
+counter.onclick=toggleIndex;
+
+/* ───── 1 · 제목: 파티클 ───── */
+modules.title={start(s){
+  const cv=$('canvas.bgc',s);let st=fitCanvas(cv);
+  const N=110,P=[];for(let i=0;i<N;i++)P.push({x:Math.random()*st.w,y:Math.random()*st.h,vx:(Math.random()-.5)*.25,vy:(Math.random()-.5)*.25,r:Math.random()*1.8+.6});
+  let mx=-999,my=-999;
+  const mv=e=>{const r=cv.getBoundingClientRect();mx=e.clientX-r.left;my=e.clientY-r.top};
+  addEventListener('pointermove',mv);
+  const onr=()=>{st=fitCanvas(cv)};addEventListener('resize',onr);
+  const stopRaf=raf(()=>{
+    const {ctx,w,h}=st;ctx.clearRect(0,0,w,h);
+    for(const p of P){
+      const dx=p.x-mx,dy=p.y-my,d=Math.hypot(dx,dy);
+      if(d<220){const f=(1-d/220)*.6;p.vx+=dx/d*f*.06;p.vy+=dy/d*f*.06}
+      p.vx*=.985;p.vy*=.985;p.x+=p.vx+(Math.random()-.5)*.03;p.y+=p.vy+(Math.random()-.5)*.03;
+      if(p.x<0)p.x=w;if(p.x>w)p.x=0;if(p.y<0)p.y=h;if(p.y>h)p.y=0;
+      ctx.fillStyle='rgba(255,255,255,'+(d<220?.85:.35)+')';ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,6.283);ctx.fill();
+    }
+    ctx.lineWidth=1;
+    for(let i=0;i<N;i++)for(let j=i+1;j<N;j++){
+      const a=P[i],b=P[j],d=Math.hypot(a.x-b.x,a.y-b.y);
+      if(d<110){const near=Math.min(Math.hypot(a.x-mx,a.y-my),Math.hypot(b.x-mx,b.y-my))<220;
+        ctx.strokeStyle=near?'rgba(255,59,48,'+(1-d/110)*.7+')':'rgba(255,255,255,'+(1-d/110)*.12+')';
+        ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke()}
+    }
+  });
+  s._cleanup=()=>{stopRaf();removeEventListener('pointermove',mv);removeEventListener('resize',onr)};
+},stop(s){s._cleanup&&s._cleanup()}};
+
+/* ───── 4 · 정의 ───── */
+modules.defs={start(s){
+  const rows=$$('.defrows .row',s),dw=$('#dw',s),dd=$('#dd',s),who=$('#dwho',s);
+  let i=0,timer=null,hold=false;
+  function show(k,instant){
+    rows.forEach((r,j)=>r.classList.toggle('on',j===k));
+    const r=rows[k];
+    const apply=()=>{dw.textContent=r.dataset.k;dd.textContent=r.dataset.d;who.textContent=r.dataset.w;[dw,dd,who].forEach(e=>e.classList.remove('out'))};
+    if(instant){apply();return}
+    [dw,dd,who].forEach(e=>e.classList.add('out'));setTimeout(apply,260);
+  }
+  show(0,true);
+  timer=setInterval(()=>{if(hold)return;i=(i+1)%rows.length;show(i)},3600);
+  rows.forEach((r,j)=>{r.onmouseenter=r.onclick=()=>{hold=true;i=j;show(j);clearTimeout(s._h);s._h=setTimeout(()=>hold=false,9000)}});
+  s._cleanup=()=>{clearInterval(timer);clearTimeout(s._h)};
+},stop(s){s._cleanup&&s._cleanup()}};
+
+/* ───── 5 · 상호작용성 데모 ───── */
+modules.demo={start(s){
+  const stage=$('.stage',s),cv=$('canvas',s),hint=$('.hint',s);
+  let st=fitCanvas(cv);const ro=new ResizeObserver(()=>{st=fitCanvas(cv)});ro.observe(stage);
+  const V={speed:.9,range:.85,mapping:1};
+  const inp={speed:$('#sp',s),range:$('#rg',s),mapping:$('#mp',s)},lab={speed:$('#vsp',s),range:$('#vrg',s),mapping:$('#vmp',s)};
+  const scoreEl=$('#score',s),statusEl=$('#status',s),btn=$('#break',s);
+  function syncUI(){let sc=0;for(const k in V){inp[k].value=Math.round(V[k]*100);inp[k].style.setProperty('--p',Math.round(V[k]*100)+'%');lab[k].textContent=Math.round(V[k]*100);sc+=V[k]}
+    sc=sc/3;scoreEl.textContent=Math.round(sc*100);const low=sc<.45;scoreEl.classList.toggle('low',low);statusEl.classList.toggle('low',low);
+    statusEl.textContent=sc>.8?'살아 있다':sc>.55?'조금 답답하다':sc>.3?'둔하다':'죽어 있다';}
+  for(const k in inp){inp[k].oninput=()=>{V[k]=inp[k].value/100;syncUI()}}
+  let broken=false,tw=null;
+  btn.onclick=()=>{broken=!broken;const to=broken?{speed:.12,range:.3,mapping:.1}:{speed:.9,range:.85,mapping:1};btn.textContent=broken?'되돌리기':'망가뜨리기';
+    const from={...V},t0=performance.now();cancelAnimationFrame(tw);const step=t=>{const p=clamp((t-t0)/700,0,1);for(const k in V)V[k]=lerp(from[k],to[k],p);syncUI();if(p<1)tw=requestAnimationFrame(step)};tw=requestAnimationFrame(step)};
+  syncUI();
+  let tx=0,ty=0,px=null,py=null,active=false;const trail=[];
+  stage.onpointermove=e=>{const r=stage.getBoundingClientRect();tx=e.clientX-r.left;ty=e.clientY-r.top;if(!active){active=true;hint.style.opacity=0}};
+  const stopRaf=raf((t,dt)=>{
+    const {ctx,w,h}=st;ctx.clearRect(0,0,w,h);
+    const cx=w/2,cy=h/2;
+    if(!active){tx=cx+Math.cos(t/1300)*w*.3;ty=cy+Math.sin(t/900)*h*.3}
+    let vx=tx-cx,vy=ty-cy;
+    const bx=-vy*(w/h)*.9,by=-vx*(h/w)*.9; // 꼬인 매핑: 회전 + 반전
+    let mx=lerp(bx,vx,V.mapping),my=lerp(by,vy,V.mapping);
+    const sc=lerp(.18,1,V.range);const lx=sc*(w/2-14),ly=sc*(h/2-14);
+    mx=clamp(mx,-lx,lx);my=clamp(my,-ly,ly);
+    const gx=cx+mx,gy=cy+my;
+    if(px===null){px=gx;py=gy}
+    const k=.02+.98*Math.pow(V.speed,3),kk=1-Math.pow(1-k,Math.min(3,dt/16.7||1));
+    px+=(gx-px)*kk;py+=(gy-py)*kk;
+    trail.push([px,py]);if(trail.length>26)trail.shift();
+    ctx.setLineDash([6,8]);ctx.strokeStyle='rgba(255,255,255,.18)';ctx.lineWidth=1;ctx.strokeRect(cx-lx,cy-ly,lx*2,ly*2);ctx.setLineDash([]);
+    ctx.strokeStyle='rgba(255,255,255,.22)';ctx.beginPath();ctx.moveTo(tx,ty);ctx.lineTo(px,py);ctx.stroke();
+    ctx.strokeStyle='rgba(255,255,255,.5)';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(tx,ty,9,0,6.283);ctx.stroke();
+    const low=(V.speed+V.range+V.mapping)/3<.45;
+    trail.forEach((p,i)=>{ctx.fillStyle=(low?'rgba(255,59,48,':'rgba(255,255,255,')+(i/trail.length*.28)+')';ctx.beginPath();ctx.arc(p[0],p[1],6+i*.3,0,6.283);ctx.fill()});
+    ctx.fillStyle=low?'#FF3B30':'#fff';ctx.beginPath();ctx.arc(px,py,15,0,6.283);ctx.fill();
+  });
+  s._cleanup=()=>{stopRaf();ro.disconnect();cancelAnimationFrame(tw)};
+},stop(s){s._cleanup&&s._cleanup()}};
+
+/* ───── 7 · 선형 모델 ───── */
+modules.linear={start(s){
+  const chain=$('.chain',s),pk=$('.packet',s),recv=$('#recv',s),btn=$('#send',s);
+  let cancel=null,count=0;
+  function send(){
+    cancel&&cancel();recv.innerHTML='';pk.innerHTML='사랑해';pk.style.opacity=1;
+    const nodes=$$('.node',chain),a=nodes[0].offsetLeft+nodes[0].offsetWidth/2,b=nodes[4].offsetLeft+nodes[4].offsetWidth/2;
+    const w=pk.offsetWidth;pk.style.left=(a-w/2)+'px';
+    const bad=(count++%2===0);let hit=false;const dur=RM?10:3300;
+    cancel=raf(t=>{
+      const p=clamp(t/dur,0,1),e=p<.5?2*p*p:1-Math.pow(-2*p+2,2)/2;
+      pk.style.left=(lerp(a,b,e)-pk.offsetWidth/2)+'px';
+      if(!hit&&p>.47){hit=true;if(bad){pk.innerHTML='사<span style="color:#000">▒</span>해'}}
+      if(p>=1){cancel();pk.style.opacity=0;
+        recv.innerHTML='<small>수신</small>'+(bad?'사<span class="r">▒</span>해':'사랑해');}
+    });
+  }
+  btn.onclick=send;s._t=setTimeout(send,1200);
+  s._cleanup=()=>{cancel&&cancel();clearTimeout(s._t)};
+},stop(s){s._cleanup&&s._cleanup()}};
+
+/* ───── 8 · 경험의 장 ───── */
+modules.overlap={start(s){
+  const svg=$('#ovsvg',s),ca=$('#ca',s),cb=$('#cb',s),lens=$('#lens',s),tb=$('#tb',s),tb2=$('#tb2',s),pTop=$('#pTop',s),pBot=$('#pBot',s),d1=$('#d1',s),d2=$('#d2',s),lt=$('#lt',s),lbl=$('#lb',s),pct=$('#pct',s);
+  const ax=330,ay=300,r=220;let bx=700,auto=true,sm=bx;
+  svg.onpointermove=e=>{const b=svg.getBoundingClientRect();auto=false;bx=clamp((e.clientX-b.left)/b.width*1200,ax+30,900)};
+  svg.onpointerleave=()=>{};
+  function area(d){if(d>=2*r)return 0;return (2*r*r*Math.acos(d/(2*r))-(d/2)*Math.sqrt(4*r*r-d*d))/(Math.PI*r*r)}
+  const stopRaf=raf(t=>{
+    if(auto)bx=560+Math.sin(t/1900)*200;
+    sm+=(bx-sm)*.2;const x=sm;
+    cb.setAttribute('cx',x);lens.setAttribute('cx',x);tb.setAttribute('x',x);tb2.setAttribute('x',x);
+    const mid=(ax+x)/2;
+    pTop.setAttribute('d','M'+ax+' 40 Q'+mid+' -10 '+x+' 40');pBot.setAttribute('d','M'+x+' 560 Q'+mid+' 610 '+ax+' 560');
+    lt.setAttribute('x',mid);lbl.setAttribute('x',mid);
+    const L1=pTop.getTotalLength(),L2=pBot.getTotalLength();
+    const p1=pTop.getPointAtLength(((t/1800)%1)*L1),p2=pBot.getPointAtLength(((t/1800+.5)%1)*L2);
+    d1.setAttribute('cx',p1.x);d1.setAttribute('cy',p1.y);d2.setAttribute('cx',p2.x);d2.setAttribute('cy',p2.y);
+    pct.textContent=Math.round(area(Math.abs(x-ax))*100)+'%';
+  });
+  s._cleanup=()=>{stopRaf()};
+},stop(s){s._cleanup&&s._cleanup()}};
+
+/* ───── 11 · HCI 터미널 ───── */
+modules.hci={start(s){
+  const term=$('#term',s);let alive=true;
+  const script=[['사용자','파일 열기'],['시스템','열었습니다.',1],['사용자','저장'],['시스템','저장했습니다.',1],null,['프롬프트','발표 자료 만들어 줘'],['응답','네, 만들었습니다.',1]];
+  const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+  async function run(){
+    while(alive){
+      term.innerHTML='';
+      for(const l of script){
+        if(!alive)return;
+        if(l===null){term.insertAdjacentHTML('beforeend','<div class="gap"></div>');continue}
+        const d=document.createElement('div');d.className='ln'+(l[2]?' sys':'');
+        d.innerHTML='<span class="who">'+l[0]+' ›</span><span class="tx"></span><span class="caret"></span>';term.appendChild(d);
+        const tx=$('.tx',d);
+        for(const ch of l[1]){if(!alive)return;tx.textContent+=ch;await sleep(l[2]?25:70)}
+        $('.caret',d).remove();await sleep(l[2]?500:300);
+      }
+      await sleep(2600);
+    }
+  }
+  s._alive=()=>{alive=false};run();
+},stop(s){s._alive&&s._alive()}};
+
+/* ───── 12 · 에이전틱 ───── */
+modules.agentic={start(s){
+  const logs=$('#logs',s),gbtn=$('#gbtn',s),idle=$('#idle',s),gout=$('#gout',s);
+  const stages=[['지각','사용자의 목표를 읽는다'],['추론','가능한 경로를 따져 본다'],['계획','하위 과업으로 나눈다'],['행동','도구를 호출한다'],['성찰','결과가 목표에 맞는지 되짚는다']];
+  const asks=['AI › 발표 대상이 학부생인가요?','AI › 제안 두 가지를 준비했어요. 어느 쪽이 좋을까요?','AI › 이 부분은 판단이 필요해요. 확인해 주세요.'];
+  let i=0,round=0;
+  function add(){
+    const [n,d]=stages[i%5];
+    const el=document.createElement('div');el.className='lg';el.innerHTML='<b class="r">'+n+'</b>'+d;logs.appendChild(el);
+    if(i%5===4){const q=document.createElement('div');q.className='lg ask';q.textContent=asks[round++%asks.length];logs.appendChild(q)}
+    while(logs.children.length>9)logs.removeChild(logs.firstChild);i++;
+  }
+  add();s._int=setInterval(add,1050);
+  let busy=false;
+  gbtn.onclick=()=>{if(busy)return;busy=true;idle.style.display='none';gout.textContent='';
+    const q='발표 자료 만들어 줘',a='네, 발표 자료를 만들었습니다.';let k=0;
+    gout.innerHTML='<span style="color:#fff;font-weight:500">› </span>';
+    const t=setInterval(()=>{k++;gout.innerHTML='<span style="color:#fff;font-weight:500">› '+q.slice(0,Math.min(k,q.length))+'</span>'+(k>q.length+6?'<br>'+a.slice(0,k-q.length-6):'');
+      if(k>q.length+6+a.length){clearInterval(t);setTimeout(()=>{gout.textContent='';idle.style.display='';busy=false},2200)}},55);s._gt=t};
+  s._cleanup=()=>{clearInterval(s._int);clearInterval(s._gt);gout.textContent='';logs.innerHTML='';idle.style.display=''};
+},stop(s){s._cleanup&&s._cleanup()}};
+
+/* ───── 13 · SACM ───── */
+modules.sacm={start(s){
+  const g=$$('.nodeg',s),nm=$('#sn',s),en=$('#se',s),tx=$('#st',s);
+  const D=[['공유된 행위자성','shared agency','목표와 계획 수준에서 공동의 목표를 함께 만든다. 그 안에 책임 추적성이 들어 있다.'],['사회적 단서','social cues','자연어, 목소리, 어조. 사람은 기계도 사회적 존재로 대한다(CASA). 관계를 규정하는 형식이다.'],['상호 호혜성','reciprocity','상호 피드백으로 서로에게 적응하며 의미를 조율한다. 동태적 대칭이다.']];
+  let i=0,hold=false;
+  function show(k){g.forEach((e,j)=>e.classList.toggle('on',j===k));nm.textContent=D[k][0];en.textContent=D[k][1];tx.textContent=D[k][2]}
+  show(0);
+  s._int=setInterval(()=>{if(hold)return;i=(i+1)%3;show(i)},3200);
+  g.forEach((e,j)=>{e.onmouseenter=e.onclick=()=>{hold=true;i=j;show(j);clearTimeout(s._h);s._h=setTimeout(()=>hold=false,9000)}});
+  s._cleanup=()=>{clearInterval(s._int);clearTimeout(s._h)};
+},stop(s){s._cleanup&&s._cleanup()}};
+
+/* ───── 14 · DIAL ───── */
+const NS='http://www.w3.org/2000/svg';
+function el(tag,attrs,parent){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);parent&&parent.appendChild(e);return e}
+modules.dial={start(s){
+  const svg=$('#dialsvg',s);svg.innerHTML='';
+  const D=[['시작','initiate','추상적 목표와 가치를 공유한다. 세부 명령이 아니라 의도에서 출발한다.'],['제안','propose','AI가 병렬적으로 대안을 생성한다. 정답 하나가 아니라 선택지를 건넨다.'],['평가','evaluate','인간이 맥락과 전문성으로 비판적으로 평가한다. 수동적 수용을 막는 단계다.'],['정제','refine','AI의 성찰 루프와 인간의 문제 틀 재구성이 만난다. 아이디어를 해체하고 재조합한다.'],['통합','incorporate','산출과 실천지를 공동의 자산으로 조직한다. 하이브리드 인텔리전스가 쌓인다.']];
+  const cx=400,cy=330,R=250,hw=95,hh=38,pos=[];
+  const defs=el('defs',{},svg);const mk=el('marker',{id:'ah',viewBox:'0 0 10 10',refX:'8',refY:'5',markerWidth:'7',markerHeight:'7',orient:'auto-start-reverse'},defs);el('path',{d:'M0 0 L10 5 L0 10 z',fill:'#A1A1A6'},mk);
+  const mk2=el('marker',{id:'ahr',viewBox:'0 0 10 10',refX:'8',refY:'5',markerWidth:'7',markerHeight:'7',orient:'auto-start-reverse'},defs);el('path',{d:'M0 0 L10 5 L0 10 z',fill:'#FF3B30'},mk2);
+  D.forEach((d,i)=>{const a=(-90+72*i)*Math.PI/180;pos.push([cx+R*Math.cos(a)*1.0,cy+R*Math.sin(a)*.95])});
+  const arrows=[];
+  for(let i=0;i<5;i++){
+    const [x1,y1]=pos[i],[x2,y2]=pos[(i+1)%5];let dx=x2-x1,dy=y2-y1;const L=Math.hypot(dx,dy);const ux=dx/L,uy=dy/L;
+    const tr=(ux,uy)=>Math.min(Math.abs(ux)>1e-6?hw/Math.abs(ux):1e9,Math.abs(uy)>1e-6?hh/Math.abs(uy):1e9)+10;
+    const t1=tr(ux,uy),t2=tr(ux,uy);
+    const p=el('path',{d:'M'+(x1+ux*t1)+' '+(y1+uy*t1)+' L'+(x2-ux*t2)+' '+(y2-uy*t2),fill:'none',stroke:'#636366','stroke-width':2,'marker-end':'url(#ah)'},svg);arrows.push(p);
+  }
+  const ctr=el('g',{},svg);const circ=el('circle',{cx,cy,r:92,fill:'none',stroke:'#3A3A3C','stroke-width':1.5},ctr);
+  const c1=el('text',{x:cx,y:cy-6,'text-anchor':'middle',fill:'#fff','font-size':24,'font-weight':800},ctr);c1.textContent='하이브리드';
+  const c2=el('text',{x:cx,y:cy+26,'text-anchor':'middle',fill:'#fff','font-size':24,'font-weight':800},ctr);c2.textContent='인텔리전스';
+  const g=[];
+  D.forEach((d,i)=>{
+    const [x,y]=pos[i];const gr=el('g',{class:'nodeg'},svg);
+    el('rect',{x:x-hw,y:y-hh,width:hw*2,height:hh*2,rx:8},gr);
+    const t=el('text',{class:'t',x:x,y:y+4,'text-anchor':'middle','font-size':30,'font-weight':800},gr);t.textContent=d[0];
+    const e=el('text',{x:x,y:y+26,'text-anchor':'middle',fill:'#A1A1A6','font-size':15,'font-weight':300},gr);e.textContent=d[1];
+    g.push(gr);
+  });
+  const nm=$('#dn',s),en=$('#de',s),tx=$('#dt',s);let i=0,hold=false;
+  function show(k){g.forEach((e,j)=>e.classList.toggle('on',j===k));arrows.forEach((a,j)=>{a.setAttribute('stroke',j===k?'#FF3B30':'#636366');a.setAttribute('marker-end',j===k?'url(#ahr)':'url(#ah)')});nm.textContent=D[k][0];en.textContent=D[k][1];tx.textContent=D[k][2];nm.style.color=(k===3)?'#FF3B30':'#fff'}
+  show(0);
+  s._int=setInterval(()=>{if(hold)return;i=(i+1)%5;show(i)},2400);
+  g.forEach((e,j)=>{e.onmouseenter=e.onclick=()=>{hold=true;i=j;show(j);clearTimeout(s._h);s._h=setTimeout(()=>hold=false,9000)}});
+  s._cleanup=()=>{clearInterval(s._int);clearTimeout(s._h)};
+},stop(s){s._cleanup&&s._cleanup()}};
+
+/* ───── 15 · 두 개의 루프 ───── */
+modules.loops={start(s){
+  const svg=$('#loopsvg',s);svg.innerHTML='';
+  const L=[['지각','추론','계획','행동','성찰'],['시작','제안','평가','정제','통합']];
+  const C=[[390,320],[1110,320]],R=210;
+  const T=[el('text',{x:390,y:50,'text-anchor':'middle',fill:'#A1A1A6','font-size':26,'font-weight':500},svg),el('text',{x:1110,y:50,'text-anchor':'middle',fill:'#A1A1A6','font-size':26,'font-weight':500},svg)];
+  T[0].textContent='기계 내부의 인지 루프';T[1].textContent='인간-AI 협업 루프 (IPERI)';
+  el('line',{x1:620,y1:320,x2:880,y2:320,stroke:'#3A3A3C','stroke-width':2,'stroke-dasharray':'6 10'},svg);
+  const rings=[],nodes=[],dots=[];
+  [0,1].forEach(k=>{
+    const [cx,cy]=C[k];const g=el('g',{},svg);rings.push(g);
+    el('circle',{cx,cy,r:R,fill:'none',stroke:'#3A3A3C','stroke-width':2},g);
+    nodes[k]=[];
+    L[k].forEach((n,i)=>{
+      const a=(-90+72*i)*Math.PI/180,x=cx+R*Math.cos(a),y=cy+R*Math.sin(a);
+      const b=el('rect',{x:x-62,y:y-27,width:124,height:54,rx:27,fill:'#0E0E10',stroke:'#636366','stroke-width':2},g);
+      const t=el('text',{x:x,y:y+9,'text-anchor':'middle',fill:'#fff','font-size':26,'font-weight':700},g);t.textContent=n;
+      nodes[k].push([b,t,a]);
+    });
+    dots[k]=el('circle',{r:11,fill:'#FF3B30'},g);
+  });
+  const per=[2600,10400];
+  const stopRaf=raf(t=>{
+    const act=[0,0];
+    [0,1].forEach(k=>{
+      const ang=((t/per[k])%1)*2*Math.PI-Math.PI/2,[cx,cy]=C[k];
+      dots[k].setAttribute('cx',cx+R*Math.cos(ang));dots[k].setAttribute('cy',cy+R*Math.sin(ang));
+      let best=0,bd=9;nodes[k].forEach((n,i)=>{let d=Math.abs(((ang-n[2])%(2*Math.PI)+3*Math.PI)%(2*Math.PI)-Math.PI);d=Math.PI-d;d=Math.abs(d);if(d<bd){bd=d;best=i}});
+      act[k]=best;
+      nodes[k].forEach((n,i)=>{n[0].setAttribute('stroke',i===best?'#FF3B30':'#636366');n[1].setAttribute('fill',i===best?'#FF3B30':'#fff')});
+    });
+    const hot=(act[1]===1||act[1]===3);
+    rings[0].style.opacity=hot?1:.35;rings[0].style.transition='opacity .5s';
+    T[0].setAttribute('fill',hot?'#FF3B30':'#A1A1A6');
+  });
+  s._cleanup=()=>stopRaf();
+},stop(s){s._cleanup&&s._cleanup()}};
+
+/* ───── 17 · 세 전제: 취소선 ───── */
+modules.premise={start(s){
+  $$('.card',s).forEach((c,i)=>{const st=$('.st',c);st.style.cssText='text-decoration:none;background:linear-gradient(#FF3B30,#FF3B30) no-repeat 0 55%/0 3px;transition:background-size .9s var(--ease) '+(1.1+i*.35)+'s;';requestAnimationFrame(()=>requestAnimationFrame(()=>{st.style.backgroundSize='100% 3px'}))});
+},stop(s){$$('.st',s).forEach(st=>{st.style.backgroundSize='0 3px';st.style.transition='none'})}};
+
+/* ───── 18 · 네트워크 ───── */
+modules.network={start(s){
+  const cv=$('#netc',s);let st=fitCanvas(cv);
+  const onr=()=>{st=fitCanvas(cv)};addEventListener('resize',onr);
+  const nodes=[{h:1,x:.12,y:.5,l:'인간'},{x:.40,y:.18},{x:.42,y:.82},{x:.66,y:.5},{x:.88,y:.24},{x:.88,y:.78}];
+  nodes.forEach((n,i)=>{n.ph=Math.random()*6.28;n.i=i;if(!n.h)n.l='AI '+i});
+  const edges=[];for(let i=0;i<nodes.length;i++)for(let j=i+1;j<nodes.length;j++){if(nodes[i].h&&![1,2].includes(j))continue;edges.push([i,j])}
+  const aa=$('#n_aa',s),ha=$('#n_ha',s);let caa=0,cha=0;const M=[];
+  let mx=.5,my=.5;const mv=e=>{const r=cv.getBoundingClientRect();mx=(e.clientX-r.left)/r.width;my=(e.clientY-r.top)/r.height};addEventListener('pointermove',mv);
+  let acc=0;
+  const stopRaf=raf((t,dt)=>{
+    const {ctx,w,h}=st;ctx.clearRect(0,0,w,h);
+    const pos=nodes.map(n=>[n.x*w+Math.sin(t/1700+n.ph)*10+(mx-.5)*-24*(n.h?.4:1),n.y*h+Math.cos(t/1400+n.ph)*10+(my-.5)*-16]);
+    ctx.lineWidth=1;ctx.strokeStyle='rgba(255,255,255,.10)';edges.forEach(([i,j])=>{ctx.beginPath();ctx.moveTo(pos[i][0],pos[i][1]);ctx.lineTo(pos[j][0],pos[j][1]);ctx.stroke()});
+    acc+=dt;const rate=RM?99999:230;
+    if(acc>rate){acc=0;const e=edges[Math.floor(Math.random()*edges.length)];const hum=nodes[e[0]].h||nodes[e[1]].h;
+      if(hum&&Math.random()<.45||!hum){const fr=Math.random()<.5?[e[0],e[1]]:[e[1],e[0]];M.push({a:fr[0],b:fr[1],p:0,sp:.9+Math.random()*.9,hum,red:!hum})}}
+    for(let k=M.length-1;k>=0;k--){const m=M[k];m.p+=dt/1000*m.sp;if(m.p>=1){if(m.hum){cha++;ha.textContent=cha}else{caa++;aa.textContent=caa}M.splice(k,1);continue}
+      const A=pos[m.a],B=pos[m.b],x=lerp(A[0],B[0],m.p),y=lerp(A[1],B[1],m.p);
+      for(let q=1;q<6;q++){const pp=Math.max(0,m.p-q*.025);ctx.fillStyle=(m.red?'rgba(255,59,48,':'rgba(255,255,255,')+(.35-q*.06)+')';ctx.beginPath();ctx.arc(lerp(A[0],B[0],pp),lerp(A[1],B[1],pp),4-q*.4,0,6.283);ctx.fill()}
+      ctx.fillStyle=m.red?'#FF3B30':'#fff';ctx.beginPath();ctx.arc(x,y,5,0,6.283);ctx.fill()}
+    nodes.forEach((n,i)=>{const [x,y]=pos[i];
+      if(n.h){ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(x,y,26,0,6.283);ctx.fill();ctx.fillStyle='#0E0E10';ctx.font='800 20px NanumSquareNeo,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('인간',x,y+1)}
+      else{ctx.strokeStyle='#FF3B30';ctx.lineWidth=2.5;ctx.fillStyle='#0E0E10';ctx.beginPath();ctx.arc(x,y,22,0,6.283);ctx.fill();ctx.stroke();
+        const pr=(Math.sin(t/600+n.ph)+1)/2;ctx.strokeStyle='rgba(255,59,48,'+(.35*(1-pr))+')';ctx.lineWidth=2;ctx.beginPath();ctx.arc(x,y,22+pr*16,0,6.283);ctx.stroke();
+        ctx.fillStyle='#FF3B30';ctx.font='800 17px NanumSquareNeo,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('AI',x,y+1)}});
+  });
+  s._cleanup=()=>{stopRaf();removeEventListener('resize',onr);removeEventListener('pointermove',mv);aa.textContent='0';ha.textContent='0'};
+},stop(s){s._cleanup&&s._cleanup()}};
+
+/* ───── 19 · 소멸 ───── */
+modules.vanish={start(s){
+  const gones=$$('.gone',s),fin=$('#final',s),rp=$('#replay',s);
+  gones.forEach(g=>{if(!g.dataset.done){const t=g.dataset.ch;g.innerHTML=[...t].map(c=>'<span class="ch">'+c+'</span>').join('');
+    $$('.ch',g).forEach(c=>{c.style.setProperty('--dx',(Math.random()*240-120)+'px');c.style.setProperty('--dy',(Math.random()*-220-30)+'px');c.style.setProperty('--rot',(Math.random()*120-60)+'deg')});g.dataset.done=1}});
+  const timers=[];
+  function reset(){timers.forEach(clearTimeout);timers.length=0;fin.classList.remove('on');gones.forEach(g=>{g.style.transition='none';g.classList.remove('go');g.style.width='';void g.offsetWidth;g.style.width=g.scrollWidth+'px';g.style.transition=''})}
+  function play(){reset();
+    const base=RM?0:2300;
+    gones.forEach((g,i)=>{timers.push(setTimeout(()=>{g.style.width=g.scrollWidth+'px';void g.offsetWidth;g.classList.add('go')},base+i*900))});
+    timers.push(setTimeout(()=>fin.classList.add('on'),base+gones.length*900+1800));
+  }
+  s._ready=setTimeout(play,60);
+  rp.onclick=play;s.onclick=e=>{if(e.target===s)play()};
+  s._cleanup=()=>{timers.forEach(clearTimeout);clearTimeout(s._ready)};
+},stop(s){s._cleanup&&s._cleanup()}};
+
+/* 시작 */
+const h=parseInt(location.hash.slice(1),10);
+go(isNaN(h)?0:h-1);
+addEventListener('resize',()=>{});
+})();
+</script>
+</body>
+</html>
